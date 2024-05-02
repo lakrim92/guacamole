@@ -100,23 +100,17 @@ services:
       - "8404:8404"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - certs:/usr/local/etc/haproxy/certs/
     networks:
       - haproxy-net
     restart: always
     environment:
-      ENDPOINT: 'your-fqdn'
+      ENDPOINT: '$(curl -s ifconfig.me)'
 
   reverse-proxy-https-helper:
     image: alpine
-    command: sh -c "cd /etc/ssl/traefik && wget traefik.me/cert.pem -O cert.pem && wget traefik.me/privkey.pem -O privkey.pem && cat cert.pem privkey.pem > traefik.me.pem"
-    volumes:
-      - certs:/etc/ssl/trafik
+    command: sh -c "echo 'No certificate generation needed for IP address'"
     networks:
       - haproxy-net
-
-volumes:
-  certs:
 
 networks:
   haproxy-net:
@@ -145,16 +139,13 @@ defaults
 frontend myfrontend
   mode http
   bind :80
-  bind :443 ssl crt /usr/local/etc/haproxy/certs/traefik.me.pem
+  bind :443 ssl crt /etc/ssl/certs/haproxy-ssl.pem
   http-request redirect scheme https code 301 unless { ssl_fc }
   use_backend %[req.hdr(host),lower]
 
 backend "your-fqdn"
   server guacamole guacamole:8080 check inter 10s resolvers docker-resolver
 EOF
-
-# Create .env file for HAProxy endpoint
-echo "ENDPOINT='your-fqdn'" > ~/docker-stack/haproxy/.env
 
 # Start containers
 cd ~/docker-stack/haproxy
