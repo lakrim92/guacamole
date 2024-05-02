@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Install curl
+sudo apt update
+sudo apt install -y curl
+
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
@@ -155,4 +159,5 @@ cd ~/docker-stack/guacamole
 docker-compose up -d
 
 echo "Guacamole and HAProxy have been deployed successfully."
+
 
