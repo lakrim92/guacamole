@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Install curl
+# Update packages and install necessary dependencies
 sudo apt update
-sudo apt install -y curl
+sudo apt install -y curl vagrant
 
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -24,7 +24,7 @@ chmod -R 700 ~/docker-stack/guacamole/init
 docker run --rm guacamole/guacamole:1.5.3 /opt/guacamole/bin/initdb.sh --postgresql ~/docker-stack/guacamole/init/initdb.sql
 
 # Create Docker Compose file for Guacamole
-cat << EOF > ~/docker-stack/guacamole/docker-compose.yml
+cat > ~/docker-stack/guacamole/docker-compose.yml << 'EOF'
 version: '3.9'
 
 networks:
@@ -84,14 +84,14 @@ services:
 EOF
 
 # Create .env file for Guacamole credentials
-cat << EOF > ~/docker-stack/guacamole/.env
+cat > ~/docker-stack/guacamole/.env << 'EOF'
 POSTGRES_PASSWORD='YourStrongPassword'
 POSTGRES_USER='guacamole-user'
 EOF
 
 # Install HAProxy
 mkdir -p ~/docker-stack/haproxy
-cat << EOF > ~/docker-stack/haproxy/docker-compose.yml
+cat > ~/docker-stack/haproxy/docker-compose.yml << 'EOF'
 version: '3.9'
 
 services:
@@ -122,7 +122,7 @@ networks:
 EOF
 
 # Create HAProxy configuration file
-cat << EOF > ~/docker-stack/haproxy/haproxy.cfg
+cat > ~/docker-stack/haproxy/haproxy.cfg << 'EOF'
 global
   stats socket /var/run/api.sock user haproxy group haproxy mode 660 level admin
   log stdout format raw local0 info
@@ -151,13 +151,31 @@ backend "your-fqdn"
   server guacamole guacamole:8080 check inter 10s resolvers docker-resolver
 EOF
 
-# Start containers
-cd ~/docker-stack/haproxy
-docker-compose up -d
+# Vagrant setup for agent and server
+mkdir -p ~/vagrant/guacamole
+cd ~/vagrant/guacamole
 
-cd ~/docker-stack/guacamole
-docker-compose up -d
+# Initialize Vagrant configuration
+vagrant init
 
-echo "Guacamole and HAProxy have been deployed successfully."
+# Modify Vagrantfile for your needs
+cat > Vagrantfile << 'EOF'
+Vagrant.configure("2") do |config|
+  config.vm.define "guacamole-agent" do |agent|
+    agent.vm.box = "ubuntu/focal64"
+    agent.vm.network "private_network", type: "dhcp"
+    agent.vm.provision "shell", path: "~/docker-stack/guacamole/docker-compose.yml"
+  end
 
+  config.vm.define "guacamole-server" do |server|
+    server.vm.box = "ubuntu/focal64"
+    server.vm.network "private_network", type: "dhcp"
+    server.vm.provision "shell", path: "~/docker-stack/haproxy/docker-compose.yml"
+  end
+end
+EOF
 
+# Start Vagrant environment
+vagrant up
+
+echo "Guacamole and HAProxy have been deployed successfully with Vagrant."
